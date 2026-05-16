@@ -264,31 +264,39 @@
     }
 
     function handleIosImage(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+  const file = event.target.files[0];
+  if (!file) return;
 
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = function() {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        URL.revokeObjectURL(url);
-
-        // איפוס input כדי לאפשר סריקה חוזרת
-        event.target.value = "";
-
-        if (code && code.data) {
-          onQRScanned(code.data);
-        } else {
-          showError("לא זוהה QR – נסי שוב");
-          setTimeout(hideError, 2000);
-        }
-      };
-      img.src = url;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function() {
+    // מקטין את התמונה
+    const MAX = 1024;
+    let w = img.width;
+    let h = img.height;
+    if (w > MAX || h > MAX) {
+      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+      else { w = Math.round(w * MAX / h); h = MAX; }
     }
+    canvas.width = w;
+    canvas.height = h;
+    ctx.drawImage(img, 0, 0, w, h);
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "attemptBoth"
+    });
+    URL.revokeObjectURL(url);
+    event.target.value = "";
+
+    if (code && code.data) {
+      onQRScanned(code.data);
+    } else {
+      showError("לא זוהה QR – נסי שוב");
+      setTimeout(hideError, 2000);
+    }
+  };
+  img.src = url;
+}
 
     // ===== משותף =====
     function parseQR(text) {
