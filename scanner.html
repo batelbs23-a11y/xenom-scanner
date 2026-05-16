@@ -91,6 +91,19 @@
       display: block;
     }
     canvas { display: none; }
+    .btn-ready {
+      width: 100%;
+      padding: 14px;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      display: none;
+    }
+    .btn-ready.visible { display: block; }
     .result-banner {
       border-radius: 12px;
       padding: 16px;
@@ -162,12 +175,17 @@
       <canvas id="canvas"></canvas>
     </div>
 
+    <!-- כפתור מעבר לסריקת תחנה -->
+    <button class="btn-ready" id="btn-ready" onclick="readyForStation()">
+      ✓ סרוק תחנה
+    </button>
+
     <div class="result-banner" id="result-banner"></div>
     <button class="btn-reset" id="btn-reset" onclick="resetFlow()">סריקה חדשה</button>
   </div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/library/d/1Zx3xOn6Cpfm2n9wIEfYPdL0CYdpg6YIo4XfMCyfwzM0oTnwEREw81twN/27";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxux7B43Uggo91WYohzT40gKttyGxLgVJQ0WQOfsdThKCySRe6tE2l-7HOLjX9X2QoKhQ/exec";
 
     const video  = document.getElementById("video");
     const canvas = document.getElementById("canvas");
@@ -245,10 +263,12 @@
         document.getElementById("batch-card").classList.add("visible");
         document.getElementById("step1").className = "step done";
         document.getElementById("step1").innerText = "✓";
-        document.getElementById("step2").className = "step active";
-        document.getElementById("instruction").innerText = "סרוק את QR התחנה";
-        document.getElementById("sub-instruction").innerText = "START או DONE של התחנה הנוכחית";
-        step = "station";
+        document.getElementById("instruction").innerText = "פקע נסרק!";
+        document.getElementById("sub-instruction").innerText = "לחצי על הכפתור הירוק למטה כדי לסרוק תחנה";
+
+        // הצג כפתור מעבר לתחנה — עצור סריקה
+        scanning = false;
+        document.getElementById("btn-ready").classList.add("visible");
 
       } else if (step === "station") {
         if (!params.station || !params.event) {
@@ -256,6 +276,7 @@
           return;
         }
 
+        scanning = false;
         document.getElementById("instruction").innerText = "שומר...";
         document.getElementById("sub-instruction").innerText = "";
 
@@ -266,16 +287,24 @@
           + "&station=" + encodeURIComponent(params.station)
           + "&event="   + encodeURIComponent(params.event);
 
-        // שולחים בלי לחכות לתשובה — הנתונים מגיעים לשיטס
         fetch(url, { mode: "no-cors" });
 
-        // מציגים הצלחה מיד
         showSuccess("✓ " + batchData.batch + " נרשם בתחנת " + params.station + " – " + params.event);
         document.getElementById("step2").className = "step done";
         document.getElementById("step2").innerText = "✓";
         document.getElementById("step3").className = "step done";
         document.getElementById("btn-reset").classList.add("visible");
       }
+    }
+
+    function readyForStation() {
+      document.getElementById("btn-ready").classList.remove("visible");
+      document.getElementById("step2").className = "step active";
+      document.getElementById("instruction").innerText = "סרוק את QR התחנה";
+      document.getElementById("sub-instruction").innerText = "START או DONE של התחנה הנוכחית";
+      step = "station";
+      scanning = true;
+      tick();
     }
 
     function showSuccess(msg) {
@@ -296,6 +325,7 @@
       scanning = true;
       document.getElementById("batch-card").classList.remove("visible");
       document.getElementById("batch-display").innerText = "";
+      document.getElementById("btn-ready").classList.remove("visible");
       document.getElementById("btn-reset").classList.remove("visible");
       const b = document.getElementById("result-banner");
       b.className = "result-banner";
