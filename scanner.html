@@ -167,7 +167,7 @@
   </div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxPMcgGLa0HI5umcgz9XnUpI_6Oa762CcW9FxgL3OSnCn7xLspYNzKFci9PDqaS8bk_KA/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxoE1suZqGlW-EtMGACRCj6enBJgjbGkGK_sWBnZ6z7THS1-8hQWp9DvN9Nrxlbiob4A/exec";
 
     const video  = document.getElementById("video");
     const canvas = document.getElementById("canvas");
@@ -231,6 +231,30 @@
       return params;
     }
 
+    function sendToServer(url, params, onSuccess, onError) {
+      const callbackName = "cb_" + Date.now();
+      const script = document.createElement("script");
+      script.src = url + "&callback=" + callbackName;
+
+      window[callbackName] = function(res) {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        if (res.success) {
+          onSuccess();
+        } else {
+          onError(res.message || "שגיאה לא ידועה");
+        }
+      };
+
+      script.onerror = function() {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        onError("שגיאה בתקשורת עם השרת");
+      };
+
+      document.body.appendChild(script);
+    }
+
     async function onQRScanned(text) {
       const params = parseQR(text);
 
@@ -265,16 +289,21 @@
           + "&station=" + encodeURIComponent(params.station)
           + "&event="   + encodeURIComponent(params.event);
 
-        try {
-          await fetch(url, { mode: "no-cors" });
-          showSuccess("✓ " + batchData.batch + " נרשם בתחנת " + params.station + " – " + params.event);
-          document.getElementById("step2").className = "step done";
-          document.getElementById("step2").innerText = "✓";
-          document.getElementById("step3").className = "step done";
-        } catch {
-          showError("שגיאה בתקשורת עם השרת");
-        }
-        document.getElementById("btn-reset").classList.add("visible");
+        sendToServer(
+          url,
+          params,
+          function() {
+            showSuccess("✓ " + batchData.batch + " נרשם בתחנת " + params.station + " – " + params.event);
+            document.getElementById("step2").className = "step done";
+            document.getElementById("step2").innerText = "✓";
+            document.getElementById("step3").className = "step done";
+            document.getElementById("btn-reset").classList.add("visible");
+          },
+          function(errMsg) {
+            showError(errMsg);
+            document.getElementById("btn-reset").classList.add("visible");
+          }
+        );
       }
     }
 
