@@ -195,26 +195,43 @@
     }
 
     async function init() {
-      // אם BarcodeDetector לא קיים (אייפון) — טען polyfill
       if (!("BarcodeDetector" in window)) {
-        await loadScript("https://cdn.jsdelivr.net/npm/barcode-detector@2/dist/es2017/barcode_detector.min.js");
+        try {
+          await loadScript("https://cdn.jsdelivr.net/npm/barcode-detector/dist/es2017/barcode_detector.min.js");
+        } catch(e) {
+          document.getElementById("instruction").innerText = "הדפדפן לא נתמך";
+          document.getElementById("sub-instruction").innerText = "נסי Chrome על האייפון";
+          return;
+        }
       }
 
-      detector = new BarcodeDetector({ formats: ["qr_code"] });
+      try {
+        detector = new BarcodeDetector({ formats: ["qr_code"] });
+      } catch(e) {
+        document.getElementById("instruction").innerText = "הדפדפן לא נתמך";
+        document.getElementById("sub-instruction").innerText = "נסי Chrome על האייפון";
+        return;
+      }
+
       document.getElementById("instruction").innerText = "סרוק את QR הפקע";
       document.getElementById("sub-instruction").innerText = "סריקת כרטיס הניתוב של הפקע";
       await startCamera();
     }
 
     async function startCamera() {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      video.srcObject = stream;
-      await video.play();
-      scannerCard.classList.add("visible");
-      scanning = true;
-      tick();
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        video.srcObject = stream;
+        await video.play();
+        scannerCard.classList.add("visible");
+        scanning = true;
+        tick();
+      } catch(err) {
+        document.getElementById("instruction").innerText = "לא ניתן לפתוח מצלמה";
+        document.getElementById("sub-instruction").innerText = err.message;
+      }
     }
 
     function stopCamera() {
@@ -345,9 +362,6 @@
 
     init();
   </script>
-
-</body>
-</html>
 
 </body>
 </html>
