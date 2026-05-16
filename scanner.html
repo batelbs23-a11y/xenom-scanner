@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>XENOM – רישום ייצור</title>
+  <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -87,13 +88,10 @@
       display: none;
     }
     .scanner-card.visible { display: block; }
-     video {
+    video {
       width: 100%;
-      height: 220px;
-      object-fit: cover;
       display: block;
     }
-    canvas { display: none; }
     .btn {
       width: 100%;
       padding: 16px;
@@ -134,7 +132,6 @@
   <header>XENOM – רישום ייצור</header>
 
   <div class="container">
-
     <div class="status-card">
       <div class="step-indicator">
         <div class="step-wrapper">
@@ -163,14 +160,11 @@
 
     <div class="scanner-card" id="scanner-card">
       <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas"></canvas>
     </div>
 
     <div class="result-banner" id="result-banner"></div>
-
     <button class="btn btn-station" id="btn-station" onclick="startStationScan()">📷 סרוק תחנה</button>
     <button class="btn btn-reset"   id="btn-reset"   onclick="resetFlow()">סריקה חדשה</button>
-
   </div>
 
   <script>
@@ -181,56 +175,40 @@
 
     let step      = "batch";
     let batchData = null;
-    let detector  = null;
-    let scanning  = false;
-    let stream    = null;
+    let codeReader = null;
 
     async function startCamera() {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      video.srcObject = stream;
-      await video.play();
       scannerCard.classList.add("visible");
-      scanning = true;
-      tick();
+      codeReader = new ZXing.BrowserQRCodeReader();
+      try {
+        await codeReader.decodeFromVideoDevice(
+          undefined,
+          video,
+          (result, err) => {
+            if (result) {
+              codeReader.reset();
+              onQRScanned(result.getText());
+            }
+          }
+        );
+      } catch (err) {
+        document.getElementById("instruction").innerText = "לא ניתן לפתוח מצלמה";
+        document.getElementById("sub-instruction").innerText = err.message;
+      }
     }
 
     function stopCamera() {
-      scanning = false;
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-        stream = null;
+      if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
       }
-      video.srcObject = null;
       scannerCard.classList.remove("visible");
     }
 
     async function init() {
-      if (!("BarcodeDetector" in window)) {
-        document.getElementById("instruction").innerText = "הדפדפן לא תומך בסריקה";
-        document.getElementById("sub-instruction").innerText = "נסי Chrome עדכני על אנדרואיד";
-        return;
-      }
-      detector = new BarcodeDetector({ formats: ["qr_code"] });
       document.getElementById("instruction").innerText = "סרוק את QR הפקע";
       document.getElementById("sub-instruction").innerText = "סריקת כרטיס הניתוב של הפקע";
       await startCamera();
-    }
-
-    async function tick() {
-      if (!scanning) return;
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        try {
-          const barcodes = await detector.detect(video);
-          if (barcodes.length > 0) {
-            scanning = false;
-            await onQRScanned(barcodes[0].rawValue);
-            return;
-          }
-        } catch (e) {}
-      }
-      requestAnimationFrame(tick);
     }
 
     function parseQR(text) {
@@ -249,11 +227,7 @@
       if (step === "batch") {
         if (!params.batch || !params.sku) {
           showError("QR לא תקין – סרוק שוב");
-          setTimeout(() => {
-            hideError();
-            scanning = true;
-            tick();
-          }, 2000);
+          setTimeout(() => { hideError(); startCamera(); }, 2000);
           return;
         }
         batchData = params;
@@ -272,11 +246,7 @@
       } else if (step === "station") {
         if (!params.station || !params.event) {
           showError("QR לא תקין – סרוק שוב");
-          setTimeout(() => {
-            hideError();
-            scanning = true;
-            tick();
-          }, 2000);
+          setTimeout(() => { hideError(); startCamera(); }, 2000);
           return;
         }
         stopCamera();
@@ -293,7 +263,7 @@
 
         fetch(url, { mode: "no-cors" });
 
-        showSuccess("✓ " + batchData.batch + " נרשם\nתחנה: " + params.station + " – " + params.event);
+        showSuccess("✓ " + batchData.batch + "\nתחנה: " + params.station + " – " + params.event);
         document.getElementById("step2").className = "step done";
         document.getElementById("step2").innerText = "✓";
         document.getElementById("step3").className = "step done";
@@ -304,7 +274,7 @@
     async function startStationScan() {
       document.getElementById("btn-station").classList.remove("visible");
       document.getElementById("instruction").innerText = "סרוק את QR התחנה";
-      document.getElementById("sub-instruction").innerText = "START או DONE של התחנה הנוכחית";
+      document.getElementById("sub-instruction").innerText = "START או END של התחנה הנוכחית";
       step = "station";
       await startCamera();
     }
@@ -335,9 +305,7 @@
       document.getElementById("batch-display").innerText = "";
       document.getElementById("btn-station").classList.remove("visible");
       document.getElementById("btn-reset").classList.remove("visible");
-      const b = document.getElementById("result-banner");
-      b.className = "result-banner";
-      b.innerText = "";
+      hideError();
       document.getElementById("step1").className = "step active";
       document.getElementById("step1").innerText = "1";
       document.getElementById("step2").className = "step";
