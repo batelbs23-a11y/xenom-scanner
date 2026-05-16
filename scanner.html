@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>XENOM – רישום ייצור</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -183,34 +184,13 @@
     let detector  = null;
     let scanning  = false;
     let stream    = null;
-
-    function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = src;
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
+    let useJsQR   = false;
 
     async function init() {
-      if (!("BarcodeDetector" in window)) {
-        try {
-          await loadScript("https://cdn.jsdelivr.net/npm/barcode-detector/dist/es2017/barcode_detector.min.js");
-        } catch(e) {
-          document.getElementById("instruction").innerText = "הדפדפן לא נתמך";
-          document.getElementById("sub-instruction").innerText = "נסי Chrome על האייפון";
-          return;
-        }
-      }
+      useJsQR = !("BarcodeDetector" in window);
 
-      try {
+      if (!useJsQR) {
         detector = new BarcodeDetector({ formats: ["qr_code"] });
-      } catch(e) {
-        document.getElementById("instruction").innerText = "הדפדפן לא נתמך";
-        document.getElementById("sub-instruction").innerText = "נסי Chrome על האייפון";
-        return;
       }
 
       document.getElementById("instruction").innerText = "סרוק את QR הפקע";
@@ -220,9 +200,12 @@
 
     async function startCamera() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
+        // הגדרות מצלמה מותאמות לאייפון ואנדרואיד
+        const constraints = useJsQR
+          ? { video: { facingMode: "environment" } }  // אייפון - פשוט ללא רזולוציה
+          : { video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
         await video.play();
         scannerCard.classList.add("visible");
@@ -243,16 +226,35 @@
 
     async function tick() {
       if (!scanning) return;
+
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        try {
-          const barcodes = await detector.detect(video);
-          if (barcodes.length > 0) {
+        if (useJsQR) {
+          // אייפון - jsQR
+          canvas.width  = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert"
+          });
+          if (code && code.data) {
             scanning = false;
-            await onQRScanned(barcodes[0].rawValue);
+            await onQRScanned(code.data);
             return;
           }
-        } catch (e) {}
+        } else {
+          // אנדרואיד - BarcodeDetector
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              scanning = false;
+              await onQRScanned(barcodes[0].rawValue);
+              return;
+            }
+          } catch (e) {}
+        }
       }
+
       requestAnimationFrame(tick);
     }
 
