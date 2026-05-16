@@ -87,9 +87,9 @@
       display: none;
     }
     .scanner-card.visible { display: block; }
-    video {
+      video {
       width: 100%;
-      height: 280px;
+      height: 220px;
       object-fit: cover;
       display: block;
     }
@@ -134,6 +134,7 @@
   <header>XENOM – רישום ייצור</header>
 
   <div class="container">
+
     <div class="status-card">
       <div class="step-indicator">
         <div class="step-wrapper">
@@ -166,16 +167,16 @@
     </div>
 
     <div class="result-banner" id="result-banner"></div>
+
     <button class="btn btn-station" id="btn-station" onclick="startStationScan()">📷 סרוק תחנה</button>
     <button class="btn btn-reset"   id="btn-reset"   onclick="resetFlow()">סריקה חדשה</button>
+
   </div>
 
   <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxux7B43Uggo91WYohzT40gKttyGxLgVJQ0WQOfsdThKCySRe6tE2l-7HOLjX9X2QoKhQ/exec";
 
     const video       = document.getElementById("video");
-    const canvas      = document.getElementById("canvas");
-    const ctx         = canvas.getContext("2d");
     const scannerCard = document.getElementById("scanner-card");
 
     let step      = "batch";
@@ -248,11 +249,16 @@
       if (step === "batch") {
         if (!params.batch || !params.sku) {
           showError("QR לא תקין – סרוק שוב");
-          setTimeout(() => { hideError(); scanning = true; tick(); }, 2000);
+          setTimeout(() => {
+            hideError();
+            scanning = true;
+            tick();
+          }, 2000);
           return;
         }
         batchData = params;
         stopCamera();
+
         document.getElementById("batch-display").innerText =
           params.batch + " | " + (params.product || "");
         document.getElementById("batch-card").classList.add("visible");
@@ -266,10 +272,15 @@
       } else if (step === "station") {
         if (!params.station || !params.event) {
           showError("QR לא תקין – סרוק שוב");
-          setTimeout(() => { hideError(); scanning = true; tick(); }, 2000);
+          setTimeout(() => {
+            hideError();
+            scanning = true;
+            tick();
+          }, 2000);
           return;
         }
         stopCamera();
+
         document.getElementById("instruction").innerText = "שומר...";
         document.getElementById("sub-instruction").innerText = "";
 
@@ -282,7 +293,7 @@
 
         fetch(url, { mode: "no-cors" });
 
-        showSuccess("✓ " + batchData.batch + "\nתחנה: " + params.station + " – " + params.event);
+        showSuccess("✓ " + batchData.batch + " נרשם\nתחנה: " + params.station + " – " + params.event);
         document.getElementById("step2").className = "step done";
         document.getElementById("step2").innerText = "✓";
         document.getElementById("step3").className = "step done";
@@ -293,7 +304,7 @@
     async function startStationScan() {
       document.getElementById("btn-station").classList.remove("visible");
       document.getElementById("instruction").innerText = "סרוק את QR התחנה";
-      document.getElementById("sub-instruction").innerText = "START או END של התחנה הנוכחית";
+      document.getElementById("sub-instruction").innerText = "START או DONE של התחנה הנוכחית";
       step = "station";
       await startCamera();
     }
@@ -324,7 +335,9 @@
       document.getElementById("batch-display").innerText = "";
       document.getElementById("btn-station").classList.remove("visible");
       document.getElementById("btn-reset").classList.remove("visible");
-      hideError();
+      const b = document.getElementById("result-banner");
+      b.className = "result-banner";
+      b.innerText = "";
       document.getElementById("step1").className = "step active";
       document.getElementById("step1").innerText = "1";
       document.getElementById("step2").className = "step";
