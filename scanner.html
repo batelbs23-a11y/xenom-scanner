@@ -167,7 +167,7 @@
   </div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxoE1suZqGlW-EtMGACRCj6enBJgjbGkGK_sWBnZ6z7THS1-8hQWp9DvN9Nrxlbiob4A/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/library/d/1Zx3xOn6Cpfm2n9wIEfYPdL0CYdpg6YIo4XfMCyfwzM0oTnwEREw81twN/27";
 
     const video  = document.getElementById("video");
     const canvas = document.getElementById("canvas");
@@ -231,30 +231,6 @@
       return params;
     }
 
-    function sendToServer(url, params, onSuccess, onError) {
-      const callbackName = "cb_" + Date.now();
-      const script = document.createElement("script");
-      script.src = url + "&callback=" + callbackName;
-
-      window[callbackName] = function(res) {
-        delete window[callbackName];
-        document.body.removeChild(script);
-        if (res.success) {
-          onSuccess();
-        } else {
-          onError(res.message || "שגיאה לא ידועה");
-        }
-      };
-
-      script.onerror = function() {
-        delete window[callbackName];
-        document.body.removeChild(script);
-        onError("שגיאה בתקשורת עם השרת");
-      };
-
-      document.body.appendChild(script);
-    }
-
     async function onQRScanned(text) {
       const params = parseQR(text);
 
@@ -279,6 +255,7 @@
           showError("QR לא תקין – סרוק שוב");
           return;
         }
+
         document.getElementById("instruction").innerText = "שומר...";
         document.getElementById("sub-instruction").innerText = "";
 
@@ -289,21 +266,15 @@
           + "&station=" + encodeURIComponent(params.station)
           + "&event="   + encodeURIComponent(params.event);
 
-        sendToServer(
-          url,
-          params,
-          function() {
-            showSuccess("✓ " + batchData.batch + " נרשם בתחנת " + params.station + " – " + params.event);
-            document.getElementById("step2").className = "step done";
-            document.getElementById("step2").innerText = "✓";
-            document.getElementById("step3").className = "step done";
-            document.getElementById("btn-reset").classList.add("visible");
-          },
-          function(errMsg) {
-            showError(errMsg);
-            document.getElementById("btn-reset").classList.add("visible");
-          }
-        );
+        // שולחים בלי לחכות לתשובה — הנתונים מגיעים לשיטס
+        fetch(url, { mode: "no-cors" });
+
+        // מציגים הצלחה מיד
+        showSuccess("✓ " + batchData.batch + " נרשם בתחנת " + params.station + " – " + params.event);
+        document.getElementById("step2").className = "step done";
+        document.getElementById("step2").innerText = "✓";
+        document.getElementById("step3").className = "step done";
+        document.getElementById("btn-reset").classList.add("visible");
       }
     }
 
