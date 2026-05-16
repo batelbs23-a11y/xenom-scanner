@@ -230,7 +230,7 @@
         html5QrScanner = new Html5Qrcode("qr-reader");
         html5QrScanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+         { fps: 10, qrbox: { width: 300, height: 300 } },
           (text) => {
             html5QrScanner.stop().then(() => {
               onQRScanned(text);
