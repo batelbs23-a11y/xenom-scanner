@@ -179,7 +179,6 @@
     let scanning  = false;
 
     async function init() {
-      // בדיקה אם BarcodeDetector זמין
       if (!("BarcodeDetector" in window)) {
         document.getElementById("instruction").innerText = "הדפדפן לא תומך בסריקה";
         document.getElementById("sub-instruction").innerText = "נסי Chrome עדכני על אנדרואיד";
@@ -267,16 +266,11 @@
           + "&event="   + encodeURIComponent(params.event);
 
         try {
-          const r   = await fetch(url);
-          const res = await r.json();
-          if (res.success) {
-            showSuccess("✓ " + batchData.batch + " נרשם בתחנת " + params.station + " – " + params.event);
-            document.getElementById("step2").className = "step done";
-            document.getElementById("step2").innerText = "✓";
-            document.getElementById("step3").className = "step done";
-          } else {
-            showError(res.message || "שגיאה לא ידועה");
-          }
+          await fetch(url, { mode: "no-cors" });
+          showSuccess("✓ " + batchData.batch + " נרשם בתחנת " + params.station + " – " + params.event);
+          document.getElementById("step2").className = "step done";
+          document.getElementById("step2").innerText = "✓";
+          document.getElementById("step3").className = "step done";
         } catch {
           showError("שגיאה בתקשורת עם השרת");
         }
