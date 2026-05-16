@@ -94,21 +94,6 @@
       display: block;
     }
     canvas { display: none; }
-    .btn-scan-ios {
-      width: 100%;
-      padding: 16px;
-      background: #1a1a2e;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 18px;
-      font-weight: bold;
-      cursor: pointer;
-      display: none;
-      text-align: center;
-    }
-    .btn-scan-ios.visible { display: block; }
-    input[type="file"] { display: none; }
     .btn {
       width: 100%;
       padding: 16px;
@@ -166,7 +151,7 @@
           <div class="step-label">נשמר</div>
         </div>
       </div>
-      <div class="instruction" id="instruction">מאתחל...</div>
+      <div class="instruction" id="instruction">מאתחל מצלמה...</div>
       <div class="sub-instruction" id="sub-instruction">אנא המתיני</div>
     </div>
 
@@ -175,22 +160,16 @@
       <div class="value" id="batch-display"></div>
     </div>
 
-    <!-- אנדרואיד - מצלמה רציפה -->
     <div class="scanner-card" id="scanner-card">
       <video id="video" autoplay playsinline muted></video>
       <canvas id="canvas"></canvas>
     </div>
-
-    <!-- אייפון - כפתור פתיחת מצלמה נייטיבית -->
-    <button class="btn-scan-ios" id="btn-scan-ios" onclick="openIosCamera()">📷 סרוק QR</button>
-    <input type="file" id="ios-input" accept="image/*" capture="environment" onchange="handleIosImage(event)" />
 
     <div class="result-banner" id="result-banner"></div>
     <button class="btn btn-station" id="btn-station" onclick="startStationScan()">📷 סרוק תחנה</button>
     <button class="btn btn-reset"   id="btn-reset"   onclick="resetFlow()">סריקה חדשה</button>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
   <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxux7B43Uggo91WYohzT40gKttyGxLgVJQ0WQOfsdThKCySRe6tE2l-7HOLjX9X2QoKhQ/exec";
 
@@ -204,28 +183,30 @@
     let detector  = null;
     let scanning  = false;
     let stream    = null;
-    let isIOS     = false;
 
-    async function init() {
-      // זיהוי אייפון
-      isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-      if (isIOS) {
-        // אייפון - כפתור מצלמה נייטיבית
-        document.getElementById("btn-scan-ios").classList.add("visible");
-        document.getElementById("instruction").innerText = "סרוק את QR הפקע";
-        document.getElementById("sub-instruction").innerText = "לחצי על הכפתור לסריקה";
-      } else {
-        // אנדרואיד - BarcodeDetector
-        detector = new BarcodeDetector({ formats: ["qr_code"] });
-        document.getElementById("instruction").innerText = "סרוק את QR הפקע";
-        document.getElementById("sub-instruction").innerText = "סריקת כרטיס הניתוב של הפקע";
-        await startAndroidCamera();
-      }
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
     }
 
-    // ===== אנדרואיד =====
-    async function startAndroidCamera() {
+    async function init() {
+      // אם BarcodeDetector לא קיים (אייפון) — טען polyfill
+      if (!("BarcodeDetector" in window)) {
+        await loadScript("https://cdn.jsdelivr.net/npm/barcode-detector@2/dist/es2017/barcode_detector.min.js");
+      }
+
+      detector = new BarcodeDetector({ formats: ["qr_code"] });
+      document.getElementById("instruction").innerText = "סרוק את QR הפקע";
+      document.getElementById("sub-instruction").innerText = "סריקת כרטיס הניתוב של הפקע";
+      await startCamera();
+    }
+
+    async function startCamera() {
       stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
       });
@@ -236,7 +217,7 @@
       tick();
     }
 
-    function stopAndroidCamera() {
+    function stopCamera() {
       scanning = false;
       if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
       video.srcObject = null;
@@ -258,47 +239,6 @@
       requestAnimationFrame(tick);
     }
 
-    // ===== אייפון =====
-    function openIosCamera() {
-      document.getElementById("ios-input").click();
-    }
-
-    function handleIosImage(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = function() {
-    // מקטין את התמונה
-    const MAX = 1024;
-    let w = img.width;
-    let h = img.height;
-    if (w > MAX || h > MAX) {
-      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-      else { w = Math.round(w * MAX / h); h = MAX; }
-    }
-    canvas.width = w;
-    canvas.height = h;
-    ctx.drawImage(img, 0, 0, w, h);
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "attemptBoth"
-    });
-    URL.revokeObjectURL(url);
-    event.target.value = "";
-
-    if (code && code.data) {
-      onQRScanned(code.data);
-    } else {
-      showError("לא זוהה QR – נסי שוב");
-      setTimeout(hideError, 2000);
-    }
-  };
-  img.src = url;
-}
-
-    // ===== משותף =====
     function parseQR(text) {
       const clean = text.startsWith("?") ? text.slice(1) : text;
       const params = {};
@@ -315,13 +255,11 @@
       if (step === "batch") {
         if (!params.batch || !params.sku) {
           showError("QR לא תקין – סרוק שוב");
-          setTimeout(hideError, 2000);
+          setTimeout(() => { hideError(); scanning = true; tick(); }, 2000);
           return;
         }
         batchData = params;
-
-        if (!isIOS) stopAndroidCamera();
-
+        stopCamera();
         document.getElementById("batch-display").innerText =
           params.batch + " | " + (params.product || "");
         document.getElementById("batch-card").classList.add("visible");
@@ -330,27 +268,15 @@
         document.getElementById("step2").className = "step active";
         document.getElementById("instruction").innerText = "פקע נסרק בהצלחה!";
         document.getElementById("sub-instruction").innerText = "לחצי לסריקת תחנה";
-
-        if (isIOS) {
-          // עדכן כפתור לסריקת תחנה
-          const btn = document.getElementById("btn-scan-ios");
-          btn.innerText = "📷 סרוק תחנה";
-          btn.onclick = openIosCamera;
-        } else {
-          document.getElementById("btn-station").classList.add("visible");
-        }
-        step = "station";
+        document.getElementById("btn-station").classList.add("visible");
 
       } else if (step === "station") {
         if (!params.station || !params.event) {
           showError("QR לא תקין – סרוק שוב");
-          setTimeout(hideError, 2000);
+          setTimeout(() => { hideError(); scanning = true; tick(); }, 2000);
           return;
         }
-
-        if (!isIOS) stopAndroidCamera();
-        if (isIOS) document.getElementById("btn-scan-ios").classList.remove("visible");
-
+        stopCamera();
         document.getElementById("instruction").innerText = "שומר...";
         document.getElementById("sub-instruction").innerText = "";
 
@@ -376,7 +302,7 @@
       document.getElementById("instruction").innerText = "סרוק את QR התחנה";
       document.getElementById("sub-instruction").innerText = "START או END של התחנה הנוכחית";
       step = "station";
-      await startAndroidCamera();
+      await startCamera();
     }
 
     function showSuccess(msg) {
@@ -400,7 +326,7 @@
     function resetFlow() {
       step = "batch";
       batchData = null;
-      if (!isIOS) stopAndroidCamera();
+      stopCamera();
       document.getElementById("batch-card").classList.remove("visible");
       document.getElementById("batch-display").innerText = "";
       document.getElementById("btn-station").classList.remove("visible");
@@ -412,23 +338,16 @@
       document.getElementById("step2").innerText = "2";
       document.getElementById("step3").className = "step";
       document.getElementById("step3").innerText = "✓";
-
-      if (isIOS) {
-        const btn = document.getElementById("btn-scan-ios");
-        btn.innerText = "📷 סרוק QR";
-        btn.onclick = openIosCamera;
-        btn.classList.add("visible");
-        document.getElementById("instruction").innerText = "סרוק את QR הפקע";
-        document.getElementById("sub-instruction").innerText = "לחצי על הכפתור לסריקה";
-      } else {
-        document.getElementById("instruction").innerText = "סרוק את QR הפקע";
-        document.getElementById("sub-instruction").innerText = "סריקת כרטיס הניתוב של הפקע";
-        startAndroidCamera();
-      }
+      document.getElementById("instruction").innerText = "סרוק את QR הפקע";
+      document.getElementById("sub-instruction").innerText = "סריקת כרטיס הניתוב של הפקע";
+      startCamera();
     }
 
     init();
   </script>
+
+</body>
+</html>
 
 </body>
 </html>
